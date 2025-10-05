@@ -13,18 +13,25 @@ namespace todo_list_back.Services
             _context = context;
         }
 
-        public async Task<IEnumerable<TaskItem>> GetTasksAsync(int userId)
+        public async Task<IEnumerable<TaskItem>> GetTasksAsync(string? status = null)
         {
-            return await _context.Tasks
-                .Where(t => t.UserId == userId)
-                .OrderByDescending(t => t.Id)
-                .ToListAsync();
+            var query = _context.Tasks
+                .Include(t => t.User)
+                .AsQueryable();
+
+            if (status == "completed")
+                query = query.Where(t => t.IsCompleted);
+            else if (status == "pending")
+                query = query.Where(t => !t.IsCompleted);
+
+            return await query.OrderByDescending(t => t.Id).ToListAsync();
         }
 
-        public async Task<TaskItem?> GetByIdAsync(int userId, int taskId)
+        public async Task<TaskItem?> GetByIdAsync(int taskId)
         {
             return await _context.Tasks
-                .FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == userId);
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.Id == taskId);
         }
 
         public async Task<TaskItem> CreateAsync(int userId, TaskItem item)
@@ -37,9 +44,9 @@ namespace todo_list_back.Services
             return item;
         }
 
-        public async Task<TaskItem?> UpdateAsync(int userId, int taskId, TaskItem item)
+        public async Task<TaskItem?> UpdateAsync(int taskId, TaskItem item)
         {
-            var existing = await GetByIdAsync(userId, taskId);
+            var existing = await _context.Tasks.FindAsync(taskId);
             if (existing == null) return null;
 
             existing.Title = item.Title;
@@ -51,14 +58,40 @@ namespace todo_list_back.Services
             return existing;
         }
 
-        public async Task<bool> DeleteAsync(int userId, int taskId)
+        public async Task<TaskItem?> UpdateStatusAsync(int taskId, bool status)
         {
-            var existing = await GetByIdAsync(userId, taskId);
+            var existing = await _context.Tasks.FindAsync(taskId);
+            if (existing == null) return null;
+
+            existing.IsCompleted = status;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return existing;
+        }
+
+        public async Task<bool> DeleteAsync(int taskId)
+        {
+            var existing = await _context.Tasks.FindAsync(taskId);
             if (existing == null) return false;
 
             _context.Tasks.Remove(existing);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<object> GetSummaryAsync()
+        {
+            var total = await _context.Tasks.CountAsync();
+            var completed = await _context.Tasks.CountAsync(t => t.IsCompleted);
+            var pending = total - completed;
+
+            return new
+            {
+                total,
+                completed,
+                pending
+            };
         }
     }
 }

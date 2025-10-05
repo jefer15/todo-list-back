@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace todo_list_back.Models
 {
@@ -19,6 +20,7 @@ namespace todo_list_back.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
 
+        [JsonIgnore]
         public ICollection<TaskItem> Tasks { get; set; }
     }
 }

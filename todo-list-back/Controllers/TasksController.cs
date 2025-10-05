@@ -17,23 +17,17 @@ namespace todo_list_back.Controllers
             _taskService = taskService;
         }
 
-        private int GetUserId()
-        {
-            var userId = User.FindFirst("userId")?.Value;
-            return int.Parse(userId!);
-        }
-
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] string? status = null)
         {
-            var tasks = await _taskService.GetTasksAsync(GetUserId());
+            var tasks = await _taskService.GetTasksAsync(status);
             return Ok(tasks);
         }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var task = await _taskService.GetByIdAsync(GetUserId(), id);
+            var task = await _taskService.GetByIdAsync(id);
             if (task == null) return NotFound();
             return Ok(task);
         }
@@ -41,14 +35,23 @@ namespace todo_list_back.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(TaskItem task)
         {
-            var created = await _taskService.CreateAsync(GetUserId(), task);
+            var userId = int.Parse(User.FindFirst("userId")!.Value);
+            var created = await _taskService.CreateAsync(userId, task);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, TaskItem task)
         {
-            var updated = await _taskService.UpdateAsync(GetUserId(), id, task);
+            var updated = await _taskService.UpdateAsync(id, task);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+
+        [HttpPatch("{id:int}/status")]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] bool status)
+        {
+            var updated = await _taskService.UpdateStatusAsync(id, status);
             if (updated == null) return NotFound();
             return Ok(updated);
         }
@@ -56,9 +59,16 @@ namespace todo_list_back.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var result = await _taskService.DeleteAsync(GetUserId(), id);
+            var result = await _taskService.DeleteAsync(id);
             if (!result) return NotFound();
             return NoContent();
+        }
+
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetSummary()
+        {
+            var summary = await _taskService.GetSummaryAsync();
+            return Ok(summary);
         }
     }
 }
