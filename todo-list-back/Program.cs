@@ -9,14 +9,20 @@ using todo_list_back.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DB Context
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Password hasher
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseInMemoryDatabase("Placeholder_TestDb"));
+}
+
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// JWT
 var jwtSettings = builder.Configuration.GetSection("JWT");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
 builder.Services
@@ -35,7 +41,6 @@ builder.Services
         };
     });
 
-// Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 
@@ -43,7 +48,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Optional: CORS for Angular dev server
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -54,11 +58,14 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Apply migrations on startup (optional - useful in dev)
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    if (!env.EnvironmentName.Equals("Testing", StringComparison.OrdinalIgnoreCase))
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+    }
 }
 
 if (app.Environment.IsDevelopment())
@@ -75,3 +82,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }
